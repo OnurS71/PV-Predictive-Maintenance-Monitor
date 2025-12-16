@@ -20,8 +20,6 @@ PLANTS = [
         "type": "Dachanlage",
         "lat": 48.2082,
         "lon": 16.3738,
-        "tilt": 30,
-        "orientation": "Süd",
         "kwp": 120
     },
     {
@@ -31,8 +29,6 @@ PLANTS = [
         "type": "Dachanlage",
         "lat": 48.3069,
         "lon": 14.2858,
-        "tilt": 25,
-        "orientation": "Süd-Ost",
         "kwp": 80
     },
     {
@@ -42,13 +38,11 @@ PLANTS = [
         "type": "Freifläche",
         "lat": 47.0707,
         "lon": 15.4395,
-        "tilt": 20,
-        "orientation": "Süd",
         "kwp": 150
     }
 ]
 
-def get_weather(lat, lon):
+def get_temperature(lat, lon):
     try:
         url = (
             "https://api.open-meteo.com/v1/forecast"
@@ -57,63 +51,51 @@ def get_weather(lat, lon):
         )
         r = requests.get(url, timeout=5)
         r.raise_for_status()
-        current = r.json().get("current", {})
-        return current.get("temperature_2m", 10.0)
+        return r.json()["current"]["temperature_2m"]
     except Exception:
         return 10.0
 
-def solar_curve():
+def solar_factor():
     now = datetime.utcnow()
     hour = now.hour + now.minute / 60
-
-    # Sonnenaufgang ~6, Sonnenuntergang ~18
     if hour < 6 or hour > 18:
         return 0
-
-    # Sinuskurve (Peak um 12)
     return math.sin((hour - 6) / 12 * math.pi)
 
 @app.get("/data")
-def get_data():
-    plants_data = []
+def data():
+    result = []
+    sun = solar_factor()
 
-    sun_factor = solar_curve()
-
-    for plant in PLANTS:
-        temperature = get_weather(plant["lat"], plant["lon"])
-
-        expected_kw = plant["kwp"] * sun_factor
-        actual_kw = expected_kw * random.uniform(0.9, 1.05)
-
-        voltage = 600 + sun_factor * 100 + random.uniform(-10, 10)
+    for p in PLANTS:
+        temp = get_temperature(p["lat"], p["lon"])
+        expected_kw = p["kwp"] * sun
+        actual_kw = expected_kw * random.uniform(0.85, 1.05)
+        voltage = 600 + sun * 120 + random.uniform(-15, 15)
 
         status = "OK"
-        if temperature > 40 or voltage > 720:
+        if temp > 45 or voltage > 750 or actual_kw < expected_kw * 0.7:
             status = "ALARM"
-        elif temperature > 30:
+        elif temp > 35 or voltage > 720:
             status = "WARN"
 
-        plants_data.append({
-            "id": plant["id"],
-            "name": plant["name"],
-            "city": plant["city"],
-            "type": plant["type"],
-            "lat": plant["lat"],
-            "lon": plant["lon"],
-            "tilt": plant["tilt"],
-            "orientation": plant["orientation"],
-            "kwp": plant["kwp"],
-
-            "actual_kw": round(max(0, actual_kw), 2),
-            "expected_kw": round(max(0, expected_kw), 2),
+        result.append({
+            "id": p["id"],
+            "name": p["name"],
+            "city": p["city"],
+            "type": p["type"],
+            "lat": p["lat"],
+            "lon": p["lon"],
+            "kwp": p["kwp"],
+            "actual_kw": round(actual_kw, 2),
+            "expected_kw": round(expected_kw, 2),
             "voltage": round(voltage, 1),
-            "temperature": round(temperature, 1),
-
+            "temperature": round(temp, 1),
             "status": status,
             "timestamp": datetime.utcnow().isoformat()
         })
 
-    return {"plants": plants_data}
+    return {"plants": result}
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
