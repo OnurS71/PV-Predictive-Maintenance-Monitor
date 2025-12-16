@@ -4,8 +4,9 @@ async function fetchData() {
 }
 
 const charts = {};
+const maps = {};
 
-function createPlantChart(ctx, name) {
+function createPlantChart(ctx) {
   return new Chart(ctx, {
     type: "line",
     data: {
@@ -64,9 +65,7 @@ function createPlantChart(ctx, name) {
           grid: { drawOnChartArea: false },
           ticks: { color: "#ccc" }
         },
-        x: {
-          ticks: { color: "#ccc" }
-        }
+        x: { ticks: { color: "#ccc" } }
       },
       plugins: {
         legend: { labels: { color: "#ccc" } }
@@ -85,14 +84,33 @@ async function update() {
       div.className = `plant ${p.alarm}`;
       div.innerHTML = `
         <h2>${p.name} – Status: ${p.alarm}</h2>
+        <div class="info">
+          📍 ${p.location}<br>
+          🏭 ${p.type}<br>
+          ☀️ Ausrichtung: ${p.orientation}<br>
+          📐 Neigung: ${p.tilt}°<br>
+          ⚡ Leistung: ${p.peak_kwp} kWp
+        </div>
+        <div id="map-${p.id}" class="map"></div>
         <div class="chartbox">
           <canvas id="chart-${p.id}"></canvas>
         </div>
       `;
       container.appendChild(div);
 
+      const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 11);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap"
+      }).addTo(map);
+
+      L.marker([p.lat, p.lon])
+        .addTo(map)
+        .bindPopup(`<b>${p.name}</b><br>${p.type}<br>${p.peak_kwp} kWp`);
+
+      maps[p.id] = map;
+
       const ctx = document.getElementById(`chart-${p.id}`).getContext("2d");
-      charts[p.id] = createPlantChart(ctx, p.name);
+      charts[p.id] = createPlantChart(ctx);
     }
 
     const chart = charts[p.id];
@@ -116,7 +134,6 @@ async function update() {
 update();
 setInterval(update, 2000);
 
-// Absicherung gegen Dark/Light/Resize
 window.addEventListener("resize", () => {
   Object.values(charts).forEach(c => c.resize());
 });
