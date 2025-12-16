@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Unser eigenes JS -->
-    <script src="/static/dashboard.js" defer></script>
+    <script src="/static/dashboard.js?v=1" defer></script>
 
     <style>
         body { 
@@ -44,6 +44,11 @@
             width: 100%;
             height: 300px;
         }
+        
+        .chartbox {
+            height: 300px;
+            margin-top: 20px;
+        }
     </style>
 </head>
 
@@ -53,14 +58,19 @@
     <!-- Live-Karten -->
     <div id="plants"></div>
 
-    <!-- Diagramme -->
-    <h2>Leistung (kW) – Live Diagramm</h2>
-    <canvas id="kwChart"></canvas>
+  <h2>Leistung (kW) – Live Diagramm</h2>
+<div class="chartbox">
+  <canvas id="kwChart"></canvas>
+</div>
 
-    <h2>Spannung (V) – Live Diagramm</h2>
-    <canvas id="voltChart"></canvas>
+<h2>Spannung (V) – Live Diagramm</h2>
+<div class="chartbox">
+  <canvas id="voltChart"></canvas>
+</div>
 
-    <h2>Temperatur (°C) – Live Diagramm</h2>
-    <canvas id="tempChart"></canvas>
+<h2>Temperatur (°C) – Live Diagramm</h2>
+<div class="chartbox">
+  <canvas id="tempChart"></canvas>
+</div>
 </body>
 </html>
