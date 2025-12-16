@@ -1,11 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import random
 import requests
 from datetime import datetime
 
 app = FastAPI()
+
+# =========================
+# Templates & Static
+# =========================
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # =========================
 # Anlagen-Definition
@@ -67,14 +74,14 @@ def get_weather(lat, lon):
         }
 
     except Exception:
-        # Fallback → NIE 500
+        # Fallback → System bleibt stabil
         return {
             "temperature": 15.0,
             "radiation": 0.0
         }
 
 # =========================
-# Daten-Endpoint
+# Daten-Endpoint (FEHLERTOLERANT!)
 # =========================
 @app.get("/data")
 def get_data():
@@ -84,9 +91,8 @@ def get_data():
         for plant in PLANTS:
             weather = get_weather(plant["lat"], plant["lon"])
 
-            # sichere Defaults
-            radiation = weather.get("radiation", 0.0)
             temperature = weather.get("temperature", 15.0)
+            radiation = weather.get("radiation", 0.0)
 
             irradiance_factor = radiation / 1000
             kw = max(
@@ -122,9 +128,18 @@ def get_data():
         return {"plants": plants_data}
 
     except Exception as e:
-        # 🔴 GANZ WICHTIG:
-        # NIE 500, IMMER JSON
+        # 🔴 WICHTIG: NIE 500, IMMER JSON
         return {
             "plants": [],
             "error": str(e)
         }
+
+# =========================
+# Dashboard-Route
+# =========================
+@app.get("/", response_class=HTMLResponse)
+def dashboard(request: Request):
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request}
+    )
