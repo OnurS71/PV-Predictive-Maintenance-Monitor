@@ -3,54 +3,55 @@ async function fetchData() {
   return await res.json();
 }
 
-// === kW Chart ===
-const kwCtx = document.getElementById("kwChart").getContext("2d");
-const kwChart = new Chart(kwCtx, {
-  type: "line",
-  data: {
-    labels: [],
-    datasets: [
-      { label: "Anlage 1 (kW)", data: [], borderWidth: 2 },
-      { label: "Anlage 2 (kW)", data: [], borderWidth: 2 },
-      { label: "Anlage 3 (kW)", data: [], borderWidth: 2 }
-    ]
-  }
-});
+function createChart(ctx, labelSuffix) {
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { label: `Anlage 1 (${labelSuffix})`, data: [], borderWidth: 2 },
+        { label: `Anlage 2 (${labelSuffix})`, data: [], borderWidth: 2 },
+        { label: `Anlage 3 (${labelSuffix})`, data: [], borderWidth: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,   // 🔴 EXTREM WICHTIG
+      animation: false,
+      scales: {
+        x: { ticks: { color: "#ccc" } },
+        y: { ticks: { color: "#ccc" } }
+      },
+      plugins: {
+        legend: { labels: { color: "#ccc" } }
+      }
+    }
+  });
+}
 
-// === Volt Chart ===
-const voltCtx = document.getElementById("voltChart").getContext("2d");
-const voltChart = new Chart(voltCtx, {
-  type: "line",
-  data: {
-    labels: [],
-    datasets: [
-      { label: "Anlage 1 (V)", data: [], borderWidth: 2 },
-      { label: "Anlage 2 (V)", data: [], borderWidth: 2 },
-      { label: "Anlage 3 (V)", data: [], borderWidth: 2 }
-    ]
-  }
-});
+const kwChart = createChart(
+  document.getElementById("kwChart").getContext("2d"),
+  "kW"
+);
 
-// === Temperatur Chart ===
-const tempCtx = document.getElementById("tempChart").getContext("2d");
-const tempChart = new Chart(tempCtx, {
-  type: "line",
-  data: {
-    labels: [],
-    datasets: [
-      { label: "Anlage 1 (°C)", data: [], borderWidth: 2 },
-      { label: "Anlage 2 (°C)", data: [], borderWidth: 2 },
-      { label: "Anlage 3 (°C)", data: [], borderWidth: 2 }
-    ]
-  }
-});
+const voltChart = createChart(
+  document.getElementById("voltChart").getContext("2d"),
+  "V"
+);
+
+const tempChart = createChart(
+  document.getElementById("tempChart").getContext("2d"),
+  "°C"
+);
 
 async function updateCharts() {
   const json = await fetchData();
   const plants = json.plants;
   const time = new Date(plants[0].timestamp).toLocaleTimeString();
 
-  [kwChart, voltChart, tempChart].forEach(chart => chart.data.labels.push(time));
+  [kwChart, voltChart, tempChart].forEach(chart => {
+    chart.data.labels.push(time);
+  });
 
   kwChart.data.datasets[0].data.push(plants[0].kw);
   kwChart.data.datasets[1].data.push(plants[1].kw);
@@ -73,4 +74,6 @@ async function updateCharts() {
   });
 }
 
+// 🔴 DAS HAT BIS JETZT GEFEHLT
+updateCharts();                 // sofort rendern
 setInterval(updateCharts, 2000);
