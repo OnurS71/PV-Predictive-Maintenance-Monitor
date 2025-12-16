@@ -8,9 +8,15 @@ from datetime import datetime
 
 app = FastAPI()
 
+# =========================
+# Templates & Static
+# =========================
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# =========================
+# Anlagen
+# =========================
 PLANTS = [
     {
         "id": 1,
@@ -39,35 +45,4 @@ PLANTS = [
         "name": "Anlage Graz",
         "city": "Graz",
         "type": "Freifläche",
-        "lat": 47.0707,
-        "lon": 15.4395,
-        "tilt": 20,
-        "orientation": "Süd",
-        "kwp": 150
-    }
-]
-
-def get_weather(lat, lon):
-    try:
-        url = (
-            "https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            "&current=temperature_2m,shortwave_radiation"
-        )
-        r = requests.get(url, timeout=5)
-        r.raise_for_status()
-        current = r.json().get("current", {})
-        return {
-            "temperature": current.get("temperature_2m", 15.0),
-            "radiation": current.get("shortwave_radiation", 0.0)
-        }
-    except Exception:
-        return {"temperature": 15.0, "radiation": 0.0}
-
-@app.get("/data")
-def get_data():
-    plants_data = []
-
-    for plant in PLANTS:
-        weather = get_weather(plant["lat"], plant["lon"])
-        temperature = weather
+        "lat":
