@@ -8,15 +8,9 @@ from datetime import datetime
 
 app = FastAPI()
 
-# =========================
-# Templates & Static
-# =========================
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# =========================
-# Anlagen-Definition
-# =========================
 PLANTS = [
     {
         "id": 1,
@@ -53,9 +47,6 @@ PLANTS = [
     }
 ]
 
-# =========================
-# Wetterdaten (Open-Meteo)
-# =========================
 def get_weather(lat, lon):
     try:
         url = (
@@ -65,81 +56,18 @@ def get_weather(lat, lon):
         )
         r = requests.get(url, timeout=5)
         r.raise_for_status()
-        data = r.json()
-
-        current = data.get("current", {})
+        current = r.json().get("current", {})
         return {
             "temperature": current.get("temperature_2m", 15.0),
             "radiation": current.get("shortwave_radiation", 0.0)
         }
-
     except Exception:
-        # Fallback → System bleibt stabil
-        return {
-            "temperature": 15.0,
-            "radiation": 0.0
-        }
+        return {"temperature": 15.0, "radiation": 0.0}
 
-# =========================
-# Daten-Endpoint (FEHLERTOLERANT!)
-# =========================
 @app.get("/data")
 def get_data():
-    try:
-        plants_data = []
+    plants_data = []
 
-        for plant in PLANTS:
-            weather = get_weather(plant["lat"], plant["lon"])
-
-            temperature = weather.get("temperature", 15.0)
-            radiation = weather.get("radiation", 0.0)
-
-            irradiance_factor = radiation / 1000
-            kw = max(
-                0,
-                plant["kwp"] * irradiance_factor * random.uniform(0.85, 1.05)
-            )
-
-            voltage = random.uniform(650, 700)
-
-            status = "OK"
-            if temperature > 40 or voltage > 720:
-                status = "ALARM"
-            elif temperature > 30:
-                status = "WARNUNG"
-
-            plants_data.append({
-                "id": plant["id"],
-                "name": plant["name"],
-                "city": plant["city"],
-                "type": plant["type"],
-                "lat": plant["lat"],
-                "lon": plant["lon"],
-                "tilt": plant["tilt"],
-                "orientation": plant["orientation"],
-                "kwp": plant["kwp"],
-                "kw": round(kw, 2),
-                "voltage": round(voltage, 1),
-                "temperature": round(temperature, 1),
-                "status": status,
-                "timestamp": datetime.utcnow().isoformat()
-            })
-
-        return {"plants": plants_data}
-
-    except Exception as e:
-        # 🔴 WICHTIG: NIE 500, IMMER JSON
-        return {
-            "plants": [],
-            "error": str(e)
-        }
-
-# =========================
-# Dashboard-Route
-# =========================
-@app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request):
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request}
-    )
+    for plant in PLANTS:
+        weather = get_weather(plant["lat"], plant["lon"])
+        temperature = weathe
