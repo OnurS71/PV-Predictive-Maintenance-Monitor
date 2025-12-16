@@ -54,27 +54,6 @@ PLANTS = [
     }
 ]
 
-
-def get_temperature(lat, lon):
-    try:
-        url = (
-            "https://api.open-meteo.com/v1/forecast"
-            f"?latitude={lat}&longitude={lon}"
-            "&current=temperature_2m"
-        )
-        r = requests.get(url, timeout=5)
-        r.raise_for_status()
-        return r.json()["current"]["temperature_2m"]
-    except Exception:
-        return 10.0
-
-def solar_factor():
-    now = datetime.utcnow()
-    hour = now.hour + now.minute / 60
-    if hour < 6 or hour > 18:
-        return 0
-    return math.sin((hour - 6) / 12 * math.pi)
-
 def get_weather(lat, lon):
     try:
         url = (
@@ -84,21 +63,27 @@ def get_weather(lat, lon):
         )
         r = requests.get(url, timeout=5)
         r.raise_for_status()
-        current = r.json()["current"]
-
+        c = r.json()["current"]
         return {
-            "temperature": current.get("temperature_2m", 0.0),
-            "wind": current.get("wind_speed_10m", 0.0),
-            "rain": current.get("precipitation", 0.0),
-            "radiation": current.get("shortwave_radiation", 0.0)
+            "temperature": c.get("temperature_2m", 0.0),
+            "wind": c.get("wind_speed_10m", 0.0),
+            "rain": c.get("precipitation", 0.0),
+            "radiation": c.get("shortwave_radiation", 0.0),
         }
     except Exception:
         return {
             "temperature": 0.0,
             "wind": 0.0,
             "rain": 0.0,
-            "radiation": 0.0
+            "radiation": 0.0,
         }
+
+def solar_factor():
+    now = datetime.utcnow()
+    hour = now.hour + now.minute / 60
+    if hour < 6 or hour > 18:
+        return 0
+    return math.sin((hour - 6) / 12 * math.pi)
 
 @app.get("/data")
 def data():
@@ -110,10 +95,9 @@ def data():
         temp = weather["temperature"]
         radiation = weather["radiation"]
 
-
         expected_kw = p["kwp"] * sun
         actual_kw = expected_kw * random.uniform(0.85, 1.05)
-        voltage = 600 + sun * 140 + random.uniform(-20, 20)
+        voltage = 600 + sun * 120 + random.uniform(-15, 15)
 
         deviation = 0 if expected_kw == 0 else (actual_kw - expected_kw) / expected_kw * 100
 
@@ -131,7 +115,7 @@ def data():
         elif score < 75 or voltage > 720 or temp > 35:
             status = "WARN"
 
-      plants.append({
+        plants.append({
             "id": p["id"],
             "name": p["name"],
             "city": p["city"],
@@ -153,15 +137,14 @@ def data():
             "weather": {
                 "wind": round(weather["wind"], 1),
                 "rain": round(weather["rain"], 1),
-                "radiation": round(weather["radiation"], 1)
-    },
+                "radiation": round(weather["radiation"], 1),
+            },
 
             "deviation": round(deviation, 1),
             "health_score": round(score, 0),
             "status": status,
             "timestamp": datetime.utcnow().isoformat()
-})
-
+        })
 
     return {"plants": plants}
 
