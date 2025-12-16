@@ -5,18 +5,13 @@ from fastapi.templating import Jinja2Templates
 import random
 import requests
 from datetime import datetime
+import math
 
 app = FastAPI()
 
-# =========================
-# Templates & Static
-# =========================
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# =========================
-# Anlagen
-# =========================
 PLANTS = [
     {
         "id": 1,
@@ -53,48 +48,44 @@ PLANTS = [
     }
 ]
 
-# =========================
-# Wetterdaten
-# =========================
 def get_weather(lat, lon):
     try:
         url = (
             "https://api.open-meteo.com/v1/forecast"
             f"?latitude={lat}&longitude={lon}"
-            "&current=temperature_2m,shortwave_radiation"
+            "&current=temperature_2m"
         )
         r = requests.get(url, timeout=5)
         r.raise_for_status()
         current = r.json().get("current", {})
-
-        return {
-            "temperature": current.get("temperature_2m", 15.0),
-            "radiation": current.get("shortwave_radiation", 0.0)
-        }
+        return current.get("temperature_2m", 10.0)
     except Exception:
-        return {
-            "temperature": 15.0,
-            "radiation": 0.0
-        }
+        return 10.0
 
-# =========================
-# Daten-Endpoint
-# =========================
+def solar_curve():
+    now = datetime.utcnow()
+    hour = now.hour + now.minute / 60
+
+    # Sonnenaufgang ~6, Sonnenuntergang ~18
+    if hour < 6 or hour > 18:
+        return 0
+
+    # Sinuskurve (Peak um 12)
+    return math.sin((hour - 6) / 12 * math.pi)
+
 @app.get("/data")
 def get_data():
     plants_data = []
 
+    sun_factor = solar_curve()
+
     for plant in PLANTS:
-        weather = get_weather(plant["lat"], plant["lon"])
+        temperature = get_weather(plant["lat"], plant["lon"])
 
-        temperature = weather["temperature"]
-        radiation = weather["radiation"]
+        expected_kw = plant["kwp"] * sun_factor
+        actual_kw = expected_kw * random.uniform(0.9, 1.05)
 
-        irradiance_factor = radiation / 1000
-        expected_kw = max(0, plant["kwp"] * irradiance_factor)
-        actual_kw = max(0, expected_kw * random.uniform(0.85, 1.05))
-
-        voltage = random.uniform(650, 700)
+        voltage = 600 + sun_factor * 100 + random.uniform(-10, 10)
 
         status = "OK"
         if temperature > 40 or voltage > 720:
@@ -113,8 +104,8 @@ def get_data():
             "orientation": plant["orientation"],
             "kwp": plant["kwp"],
 
-            "actual_kw": round(actual_kw, 2),
-            "expected_kw": round(expected_kw, 2),
+            "actual_kw": round(max(0, actual_kw), 2),
+            "expected_kw": round(max(0, expected_kw), 2),
             "voltage": round(voltage, 1),
             "temperature": round(temperature, 1),
 
@@ -124,12 +115,6 @@ def get_data():
 
     return {"plants": plants_data}
 
-# =========================
-# Dashboard
-# =========================
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
-    return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request}
-    )
+    return templates.TemplateResponse("dashboard.html", {"request": request})
