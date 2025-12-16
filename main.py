@@ -70,4 +70,4 @@ def get_data():
 
     for plant in PLANTS:
         weather = get_weather(plant["lat"], plant["lon"])
-        temperature = weathe
+        temperature = weather
