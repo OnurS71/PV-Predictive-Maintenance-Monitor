@@ -2,10 +2,10 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import random
-import requests
 from datetime import datetime
+import random
 import math
+import requests
 
 app = FastAPI()
 
@@ -13,33 +13,9 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 PLANTS = [
-    {
-        "id": 1,
-        "name": "Anlage Wien",
-        "city": "Wien",
-        "type": "Dachanlage",
-        "lat": 48.2082,
-        "lon": 16.3738,
-        "kwp": 120
-    },
-    {
-        "id": 2,
-        "name": "Anlage Linz",
-        "city": "Linz",
-        "type": "Dachanlage",
-        "lat": 48.3069,
-        "lon": 14.2858,
-        "kwp": 80
-    },
-    {
-        "id": 3,
-        "name": "Anlage Graz",
-        "city": "Graz",
-        "type": "Freifläche",
-        "lat": 47.0707,
-        "lon": 15.4395,
-        "kwp": 150
-    }
+    {"id": 1, "name": "Anlage Wien", "city": "Wien", "lat": 48.2082, "lon": 16.3738, "kwp": 120},
+    {"id": 2, "name": "Anlage Linz", "city": "Linz", "lat": 48.3069, "lon": 14.2858, "kwp": 80},
+    {"id": 3, "name": "Anlage Graz", "city": "Graz", "lat": 47.0707, "lon": 15.4395, "kwp": 150},
 ]
 
 def get_temperature(lat, lon):
@@ -64,38 +40,50 @@ def solar_factor():
 
 @app.get("/data")
 def data():
-    result = []
+    plants = []
     sun = solar_factor()
 
     for p in PLANTS:
         temp = get_temperature(p["lat"], p["lon"])
+
         expected_kw = p["kwp"] * sun
         actual_kw = expected_kw * random.uniform(0.85, 1.05)
-        voltage = 600 + sun * 120 + random.uniform(-15, 15)
+        voltage = 600 + sun * 140 + random.uniform(-20, 20)
+
+        deviation = 0 if expected_kw == 0 else (actual_kw - expected_kw) / expected_kw * 100
+
+        score = max(
+            0,
+            100
+            - abs(deviation) * 1.5
+            - max(0, temp - 35) * 2
+            - max(0, voltage - 720) * 0.5
+        )
 
         status = "OK"
-        if temp > 45 or voltage > 750 or actual_kw < expected_kw * 0.7:
+        if score < 50 or voltage > 750 or temp > 45:
             status = "ALARM"
-        elif temp > 35 or voltage > 720:
+        elif score < 75 or voltage > 720 or temp > 35:
             status = "WARN"
 
-        result.append({
+        plants.append({
             "id": p["id"],
             "name": p["name"],
             "city": p["city"],
-            "type": p["type"],
             "lat": p["lat"],
             "lon": p["lon"],
             "kwp": p["kwp"],
-            "actual_kw": round(actual_kw, 2),
             "expected_kw": round(expected_kw, 2),
+            "actual_kw": round(actual_kw, 2),
             "voltage": round(voltage, 1),
             "temperature": round(temp, 1),
+            "deviation": round(deviation, 1),
+            "health_score": round(score, 0),
             "status": status,
             "timestamp": datetime.utcnow().isoformat()
         })
 
-    return {"plants": result}
+    return {"plants": plants}
 
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
