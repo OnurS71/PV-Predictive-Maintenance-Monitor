@@ -9,26 +9,53 @@ function createChart(ctx, labelSuffix) {
     data: {
       labels: [],
       datasets: [
-        { label: `Anlage 1 (${labelSuffix})`, data: [], borderWidth: 2 },
-        { label: `Anlage 2 (${labelSuffix})`, data: [], borderWidth: 2 },
-        { label: `Anlage 3 (${labelSuffix})`, data: [], borderWidth: 2 }
+        {
+          label: `Anlage 1 (${labelSuffix})`,
+          data: [],
+          borderWidth: 2,
+          borderColor: "#4ec9b0",
+          pointRadius: 0
+        },
+        {
+          label: `Anlage 2 (${labelSuffix})`,
+          data: [],
+          borderWidth: 2,
+          borderColor: "#569cd6",
+          pointRadius: 0
+        },
+        {
+          label: `Anlage 3 (${labelSuffix})`,
+          data: [],
+          borderWidth: 2,
+          borderColor: "#ce9178",
+          pointRadius: 0
+        }
       ]
     },
     options: {
       responsive: true,
-      maintainAspectRatio: false,   // 🔴 EXTREM WICHTIG
+      maintainAspectRatio: false,
       animation: false,
       scales: {
-        x: { ticks: { color: "#ccc" } },
-        y: { ticks: { color: "#ccc" } }
+        x: {
+          ticks: { color: "#ccc" },
+          grid: { color: "rgba(255,255,255,0.1)" }
+        },
+        y: {
+          ticks: { color: "#ccc" },
+          grid: { color: "rgba(255,255,255,0.1)" }
+        }
       },
       plugins: {
-        legend: { labels: { color: "#ccc" } }
+        legend: {
+          labels: { color: "#ccc" }
+        }
       }
     }
   });
 }
 
+/* Charts erstellen */
 const kwChart = createChart(
   document.getElementById("kwChart").getContext("2d"),
   "kW"
@@ -74,6 +101,13 @@ async function updateCharts() {
   });
 }
 
-// 🔴 DAS HAT BIS JETZT GEFEHLT
-updateCharts();                 // sofort rendern
+/* Initial + Live Update */
+updateCharts();
 setInterval(updateCharts, 2000);
+
+/* Absicherung gegen Dark/Light/Resize-Bugs */
+window.addEventListener("resize", () => {
+  kwChart.resize();
+  voltChart.resize();
+  tempChart.resize();
+});
