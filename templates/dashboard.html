@@ -4,42 +4,32 @@
   <meta charset="UTF-8">
   <title>PV Monitoring</title>
 
-  <!-- Chart.js MUSS VOR dashboard.js kommen -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- eigenes JS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <script src="/static/dashboard.js" defer></script>
 
   <style>
-    body {
-      background: #111;
-      color: #eee;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
+    body { background:#111; color:#eee; font-family:Arial; padding:20px }
+    .plant { border:2px solid #444; border-radius:10px; padding:15px; margin-bottom:40px }
+    .OK { border-color:#4ec9b0 }
+    .WARN { border-color:orange }
+    .ALARM { border-color:red }
 
-    .plant {
-      border: 2px solid #4ec9b0;
-      padding: 15px;
-      margin-bottom: 30px;
-      border-radius: 8px;
-    }
-
-    .chartbox {
-      height: 220px;
-      margin-top: 15px;
-    }
-
-    canvas {
-      background: #222;
-      border-radius: 6px;
-      padding: 10px;
-    }
+    .map { height:200px; margin-bottom:15px }
+    .charts { display:grid; gap:15px }
+    .chartbox { height:220px }
+    canvas { background:#222; border-radius:8px }
   </style>
 </head>
 
 <body>
-  <h1>PV Monitoring – Debug View</h1>
+  <h1>PV Monitoring – Anlagenstatus</h1>
   <div id="plants"></div>
 </body>
 </html>
