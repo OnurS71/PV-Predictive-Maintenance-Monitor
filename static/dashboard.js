@@ -1,10 +1,24 @@
 const charts = {};
 const maps = {};
 
-function createLineChart(ctx, label) {
+function lineChart(ctx, label) {
   return new Chart(ctx, {
     type: "line",
     data: { labels: [], datasets: [{ label, data: [], borderWidth: 2, pointRadius: 0 }] },
+    options: { responsive:true, maintainAspectRatio:false }
+  });
+}
+
+function dualChart(ctx) {
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+        { label: "Ist-Leistung (kW)", data: [], borderWidth: 2 },
+        { label: "Soll-Leistung (kW)", data: [], borderDash:[6,6], borderWidth: 2 }
+      ]
+    },
     options: { responsive:true, maintainAspectRatio:false }
   });
 }
@@ -20,14 +34,18 @@ async function update() {
       div.className = `plant ${p.status}`;
       div.innerHTML = `
         <h2>${p.name} – ${p.status}</h2>
-        <p>${p.city} | ${p.type} | ${p.kwp} kWp</p>
+        <div class="info">
+          ${p.city} | ${p.kwp} kWp<br>
+          Abweichung: ${p.deviation}%<br>
+          Health-Score: ${p.health_score}/100
+        </div>
 
         <div id="map-${p.id}" class="map"></div>
 
         <div class="charts">
-          <div class="chartbox"><canvas id="pow-${p.id}"></canvas></div>
-          <div class="chartbox"><canvas id="vol-${p.id}"></canvas></div>
-          <div class="chartbox"><canvas id="tmp-${p.id}"></canvas></div>
+          <div class="chartbox"><canvas id="p-${p.id}"></canvas></div>
+          <div class="chartbox"><canvas id="v-${p.id}"></canvas></div>
+          <div class="chartbox"><canvas id="t-${p.id}"></canvas></div>
         </div>
       `;
       container.appendChild(div);
@@ -38,9 +56,9 @@ async function update() {
       maps[p.id] = map;
 
       charts[p.id] = {
-        power: createLineChart(document.getElementById(`pow-${p.id}`), "Leistung (kW)"),
-        voltage: createLineChart(document.getElementById(`vol-${p.id}`), "Spannung (V)"),
-        temp: createLineChart(document.getElementById(`tmp-${p.id}`), "Temperatur (°C)")
+        power: dualChart(document.getElementById(`p-${p.id}`)),
+        voltage: lineChart(document.getElementById(`v-${p.id}`), "Spannung (V)"),
+        temp: lineChart(document.getElementById(`t-${p.id}`), "Temperatur (°C)")
       };
     }
 
@@ -48,6 +66,7 @@ async function update() {
 
     charts[p.id].power.data.labels.push(t);
     charts[p.id].power.data.datasets[0].data.push(p.actual_kw);
+    charts[p.id].power.data.datasets[1].data.push(p.expected_kw);
 
     charts[p.id].voltage.data.labels.push(t);
     charts[p.id].voltage.data.datasets[0].data.push(p.voltage);
@@ -56,9 +75,9 @@ async function update() {
     charts[p.id].temp.data.datasets[0].data.push(p.temperature);
 
     Object.values(charts[p.id]).forEach(c => {
-      if (c.data.labels.length > 30) {
+      if (c.data.labels.length > 40) {
         c.data.labels.shift();
-        c.data.datasets[0].data.shift();
+        c.data.datasets.forEach(d => d.data.shift());
       }
       c.update();
     });
