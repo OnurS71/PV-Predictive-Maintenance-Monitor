@@ -4,7 +4,14 @@
   <meta charset="UTF-8">
   <title>PV Monitoring – Anlagenübersicht</title>
 
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Leaflet (OpenStreetMap) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- eigenes JS -->
   <script src="/static/dashboard.js?v=1" defer></script>
 
   <style>
@@ -18,7 +25,7 @@
     h1 { color: #4ec9b0; }
 
     .plant {
-      border: 1px solid #444;
+      border: 2px solid #444;
       border-radius: 10px;
       padding: 15px;
       margin-bottom: 30px;
@@ -29,9 +36,20 @@
     .WARN { border-color: orange; }
     .ALARM { border-color: red; }
 
+    .info {
+      font-size: 14px;
+      color: #ccc;
+      margin-bottom: 10px;
+    }
+
+    .map {
+      height: 220px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
     .chartbox {
       height: 320px;
-      margin-top: 15px;
     }
 
     canvas {
