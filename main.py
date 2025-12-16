@@ -78,55 +78,53 @@ def get_weather(lat, lon):
 # =========================
 @app.get("/data")
 def get_data():
-    plants_data = []
+    try:
+        plants_data = []
 
-    for plant in PLANTS:
-        weather = get_weather(plant["lat"], plant["lon"])
+        for plant in PLANTS:
+            weather = get_weather(plant["lat"], plant["lon"])
 
-        # einfache Leistungs-Simulation
-        irradiance_factor = weather["radiation"] / 1000
-        kw = max(
-            0,
-            plant["kwp"] * irradiance_factor * random.uniform(0.85, 1.05)
-        )
+            # sichere Defaults
+            radiation = weather.get("radiation", 0.0)
+            temperature = weather.get("temperature", 15.0)
 
-        voltage = random.uniform(650, 700)
+            irradiance_factor = radiation / 1000
+            kw = max(
+                0,
+                plant["kwp"] * irradiance_factor * random.uniform(0.85, 1.05)
+            )
 
-        # Alarm-Logik
-        status = "OK"
-        if weather["temperature"] > 40 or voltage > 720:
-            status = "ALARM"
-        elif weather["temperature"] > 30:
-            status = "WARNUNG"
+            voltage = random.uniform(650, 700)
 
-        plants_data.append({
-            "id": plant["id"],
-            "name": plant["name"],
-            "city": plant["city"],
-            "type": plant["type"],
-            "lat": plant["lat"],
-            "lon": plant["lon"],
-            "tilt": plant["tilt"],
-            "orientation": plant["orientation"],
-            "kwp": plant["kwp"],
-            "kw": round(kw, 2),
-            "voltage": round(voltage, 1),
-            "temperature": round(weather["temperature"], 1),
-            "status": status,
-            "timestamp": datetime.utcnow().isoformat()
-        })
+            status = "OK"
+            if temperature > 40 or voltage > 720:
+                status = "ALARM"
+            elif temperature > 30:
+                status = "WARNUNG"
 
-    return {"plants": plants_data}
+            plants_data.append({
+                "id": plant["id"],
+                "name": plant["name"],
+                "city": plant["city"],
+                "type": plant["type"],
+                "lat": plant["lat"],
+                "lon": plant["lon"],
+                "tilt": plant["tilt"],
+                "orientation": plant["orientation"],
+                "kwp": plant["kwp"],
+                "kw": round(kw, 2),
+                "voltage": round(voltage, 1),
+                "temperature": round(temperature, 1),
+                "status": status,
+                "timestamp": datetime.utcnow().isoformat()
+            })
 
-# =========================
-# Dashboard ausliefern
-# =========================
-@app.get("/", response_class=HTMLResponse)
-def dashboard():
-    with open("dashboard.html", "r", encoding="utf-8") as f:
-        return f.read()
+        return {"plants": plants_data}
 
-# =========================
-# Static Files
-# =========================
-app.mount("/static", StaticFiles(directory="static"), name="static")
+    except Exception as e:
+        # 🔴 GANZ WICHTIG:
+        # NIE 500, IMMER JSON
+        return {
+            "plants": [],
+            "error": str(e)
+        }
