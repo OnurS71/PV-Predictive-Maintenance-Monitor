@@ -3,31 +3,45 @@ async function fetchData() {
   return await res.json();
 }
 
-function createChart(ctx, labelSuffix) {
+const charts = {};
+
+function createPlantChart(ctx, name) {
   return new Chart(ctx, {
     type: "line",
     data: {
       labels: [],
       datasets: [
         {
-          label: `Anlage 1 (${labelSuffix})`,
+          label: "Ist-Leistung (kW)",
           data: [],
-          borderWidth: 2,
           borderColor: "#4ec9b0",
+          borderWidth: 2,
+          yAxisID: "yPower",
           pointRadius: 0
         },
         {
-          label: `Anlage 2 (${labelSuffix})`,
+          label: "Soll-Leistung (kW)",
           data: [],
+          borderColor: "#4ec9b0",
+          borderDash: [6,6],
           borderWidth: 2,
+          yAxisID: "yPower",
+          pointRadius: 0
+        },
+        {
+          label: "Spannung (V)",
+          data: [],
           borderColor: "#569cd6",
+          borderWidth: 2,
+          yAxisID: "ySecondary",
           pointRadius: 0
         },
         {
-          label: `Anlage 3 (${labelSuffix})`,
+          label: "Temperatur (°C)",
           data: [],
-          borderWidth: 2,
           borderColor: "#ce9178",
+          borderWidth: 2,
+          yAxisID: "ySecondary",
           pointRadius: 0
         }
       ]
@@ -37,77 +51,72 @@ function createChart(ctx, labelSuffix) {
       maintainAspectRatio: false,
       animation: false,
       scales: {
-        x: {
-          ticks: { color: "#ccc" },
-          grid: { color: "rgba(255,255,255,0.1)" }
+        yPower: {
+          type: "linear",
+          position: "left",
+          title: { display: true, text: "Leistung (kW)" },
+          ticks: { color: "#ccc" }
         },
-        y: {
-          ticks: { color: "#ccc" },
-          grid: { color: "rgba(255,255,255,0.1)" }
+        ySecondary: {
+          type: "linear",
+          position: "right",
+          title: { display: true, text: "Spannung (V) / Temperatur (°C)" },
+          grid: { drawOnChartArea: false },
+          ticks: { color: "#ccc" }
+        },
+        x: {
+          ticks: { color: "#ccc" }
         }
       },
       plugins: {
-        legend: {
-          labels: { color: "#ccc" }
-        }
+        legend: { labels: { color: "#ccc" } }
       }
     }
   });
 }
 
-/* Charts erstellen */
-const kwChart = createChart(
-  document.getElementById("kwChart").getContext("2d"),
-  "kW"
-);
-
-const voltChart = createChart(
-  document.getElementById("voltChart").getContext("2d"),
-  "V"
-);
-
-const tempChart = createChart(
-  document.getElementById("tempChart").getContext("2d"),
-  "°C"
-);
-
-async function updateCharts() {
+async function update() {
   const json = await fetchData();
-  const plants = json.plants;
-  const time = new Date(plants[0].timestamp).toLocaleTimeString();
+  const container = document.getElementById("plants");
 
-  [kwChart, voltChart, tempChart].forEach(chart => {
+  json.plants.forEach(p => {
+    if (!charts[p.id]) {
+      const div = document.createElement("div");
+      div.className = `plant ${p.alarm}`;
+      div.innerHTML = `
+        <h2>${p.name} – Status: ${p.alarm}</h2>
+        <div class="chartbox">
+          <canvas id="chart-${p.id}"></canvas>
+        </div>
+      `;
+      container.appendChild(div);
+
+      const ctx = document.getElementById(`chart-${p.id}`).getContext("2d");
+      charts[p.id] = createPlantChart(ctx, p.name);
+    }
+
+    const chart = charts[p.id];
+    const time = new Date(p.timestamp).toLocaleTimeString();
+
     chart.data.labels.push(time);
-  });
+    chart.data.datasets[0].data.push(p.actual_kw);
+    chart.data.datasets[1].data.push(p.expected_kw);
+    chart.data.datasets[2].data.push(p.voltage);
+    chart.data.datasets[3].data.push(p.temperature);
 
-  kwChart.data.datasets[0].data.push(plants[0].kw);
-  kwChart.data.datasets[1].data.push(plants[1].kw);
-  kwChart.data.datasets[2].data.push(plants[2].kw);
-
-  voltChart.data.datasets[0].data.push(plants[0].voltage);
-  voltChart.data.datasets[1].data.push(plants[1].voltage);
-  voltChart.data.datasets[2].data.push(plants[2].voltage);
-
-  tempChart.data.datasets[0].data.push(plants[0].temperature);
-  tempChart.data.datasets[1].data.push(plants[1].temperature);
-  tempChart.data.datasets[2].data.push(plants[2].temperature);
-
-  [kwChart, voltChart, tempChart].forEach(chart => {
-    if (chart.data.labels.length > 20) {
+    if (chart.data.labels.length > 25) {
       chart.data.labels.shift();
       chart.data.datasets.forEach(ds => ds.data.shift());
     }
+
     chart.update();
   });
 }
 
-/* Initial + Live Update */
-updateCharts();
-setInterval(updateCharts, 2000);
+update();
+setInterval(update, 2000);
 
-/* Absicherung gegen Dark/Light/Resize-Bugs */
+// Absicherung gegen Dark/Light/Resize
 window.addEventListener("resize", () => {
-  kwChart.resize();
-  voltChart.resize();
-  tempChart.resize();
+  Object.values(charts).forEach(c => c.resize());
 });
