@@ -1,10 +1,17 @@
-let charts = {}; // 🔑 Chart-Registry
+let charts = {};
+let history = {}; // 🔑 Zeitreihen-Speicher
+
+function pushHistory(id, value, max = 20) {
+    if (!history[id]) history[id] = [];
+    history[id].push(value);
+    if (history[id].length > max) history[id].shift();
+    return history[id];
+}
 
 async function loadData() {
     const res = await fetch("/data");
     const data = await res.json();
     const container = document.getElementById("plants");
-
     container.innerHTML = "";
 
     data.plants.forEach(p => {
@@ -14,7 +21,7 @@ async function loadData() {
         div.innerHTML = `
             <h2>${p.name} – ${p.status}</h2>
             <div>${p.city} | ${p.kwp} kWp</div>
-            <div>Abweichung: ${p.deviation}% | Health-Score: ${p.health_score}/100</div>
+            <div>Abweichung: ${p.deviation}% | Health: ${p.health_score}/100</div>
 
             <h3>Anlagen-Steckbrief</h3>
             <div class="info-grid">
@@ -23,18 +30,15 @@ async function loadData() {
                 <div class="info-box">Modulgröße<br><b>${p.module_wp} Wp</b></div>
                 <div class="info-box">Strings<br><b>${p.strings}</b></div>
                 <div class="info-box">Baujahr<br><b>${p.year}</b></div>
-                <div class="info-box">Standort<br><b>${p.city}</b></div>
             </div>
 
-            <h3>Wetter am Standort</h3>
+            <h3>Wetter</h3>
             <div class="weather-grid">
-                <div class="info-box">Temperatur<br><b>${p.temperature} °C</b></div>
+                <div class="info-box">Temp<br><b>${p.temperature} °C</b></div>
                 <div class="info-box">Wind<br><b>${p.weather.wind} m/s</b></div>
                 <div class="info-box">Regen<br><b>${p.weather.rain} mm</b></div>
                 <div class="info-box">Einstrahlung<br><b>${p.weather.radiation} W/m²</b></div>
             </div>
-
-            <div id="map-${p.id}" class="map"></div>
 
             <canvas id="power-${p.id}"></canvas>
             <canvas id="voltage-${p.id}"></canvas>
@@ -43,34 +47,42 @@ async function loadData() {
 
         container.appendChild(div);
 
-        // Map
-        const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 10);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-        L.marker([p.lat, p.lon]).addTo(map);
+        renderChart(
+            `power-${p.id}`,
+            ["Ist", "Soll"],
+            [
+                pushHistory(`actual-${p.id}`, p.actual_kw),
+                pushHistory(`expected-${p.id}`, p.expected_kw)
+            ]
+        );
 
-        // Charts
-        renderChart(`power-${p.id}`, ["Ist", "Soll"], [[p.actual_kw], [p.expected_kw]]);
-        renderChart(`voltage-${p.id}`, ["Spannung"], [[p.voltage]]);
-        renderChart(`temp-${p.id}`, ["Temperatur"], [[p.temperature]]);
+        renderChart(
+            `voltage-${p.id}`,
+            ["Spannung"],
+            [pushHistory(`voltage-${p.id}`, p.voltage)]
+        );
+
+        renderChart(
+            `temp-${p.id}`,
+            ["Temperatur"],
+            [pushHistory(`temp-${p.id}`, p.temperature)]
+        );
     });
 }
 
-function renderChart(id, labels, values) {
+function renderChart(id, labels, datasets) {
     const canvas = document.getElementById(id);
     if (!canvas) return;
 
-    // 🔥 alten Chart zerstören
-    if (charts[id]) {
-        charts[id].destroy();
-    }
+    if (charts[id]) charts[id].destroy();
 
     charts[id] = new Chart(canvas, {
         type: "line",
         data: {
-            labels: ["now"],
+            labels: datasets[0].map((_, i) => i),
             datasets: labels.map((label, i) => ({
-                label: label,
-                data: values[i],
+                label,
+                data: datasets[i],
                 borderColor: i === 0 ? "#3ddc97" : "#ff6384",
                 borderDash: i === 1 ? [5, 5] : [],
                 fill: false,
@@ -78,14 +90,11 @@ function renderChart(id, labels, values) {
             }))
         },
         options: {
-            responsive: true,
             animation: false,
-            plugins: {
-                legend: { labels: { color: "#e0e0e0" } }
-            },
+            responsive: true,
             scales: {
-                x: { ticks: { color: "#aaa" } },
-                y: { ticks: { color: "#aaa" } }
+                x: { display: false },
+                y: { beginAtZero: false }
             }
         }
     });
