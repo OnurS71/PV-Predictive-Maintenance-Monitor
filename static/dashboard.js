@@ -1,7 +1,10 @@
+let charts = {}; // 🔑 Chart-Registry
+
 async function loadData() {
     const res = await fetch("/data");
     const data = await res.json();
     const container = document.getElementById("plants");
+
     container.innerHTML = "";
 
     data.plants.forEach(p => {
@@ -40,28 +43,50 @@ async function loadData() {
 
         container.appendChild(div);
 
+        // Map
         const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 10);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
         L.marker([p.lat, p.lon]).addTo(map);
 
-        createChart(`power-${p.id}`, ["Ist", "Soll"], [[p.actual_kw], [p.expected_kw]]);
-        createChart(`voltage-${p.id}`, ["Spannung"], [[p.voltage]]);
-        createChart(`temp-${p.id}`, ["Temperatur"], [[p.temperature]]);
+        // Charts
+        renderChart(`power-${p.id}`, ["Ist", "Soll"], [[p.actual_kw], [p.expected_kw]]);
+        renderChart(`voltage-${p.id}`, ["Spannung"], [[p.voltage]]);
+        renderChart(`temp-${p.id}`, ["Temperatur"], [[p.temperature]]);
     });
 }
 
-function createChart(id, labels, values) {
-    new Chart(document.getElementById(id), {
+function renderChart(id, labels, values) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+
+    // 🔥 alten Chart zerstören
+    if (charts[id]) {
+        charts[id].destroy();
+    }
+
+    charts[id] = new Chart(canvas, {
         type: "line",
         data: {
             labels: ["now"],
-            datasets: labels.map((l, i) => ({
-                label: l,
+            datasets: labels.map((label, i) => ({
+                label: label,
                 data: values[i],
                 borderColor: i === 0 ? "#3ddc97" : "#ff6384",
                 borderDash: i === 1 ? [5, 5] : [],
-                fill: false
+                fill: false,
+                tension: 0.3
             }))
+        },
+        options: {
+            responsive: true,
+            animation: false,
+            plugins: {
+                legend: { labels: { color: "#e0e0e0" } }
+            },
+            scales: {
+                x: { ticks: { color: "#aaa" } },
+                y: { ticks: { color: "#aaa" } }
+            }
         }
     });
 }
