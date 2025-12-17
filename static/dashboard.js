@@ -5,9 +5,15 @@ async function loadDashboard() {
     const plants = await res.json();
 
     const container = document.getElementById("plants");
+    if (!container) {
+        console.error("❌ <div id='plants'> nicht gefunden");
+        return;
+    }
+
     container.innerHTML = "";
 
     plants.forEach(p => {
+
         // ===== Anlagen-Container =====
         const plantDiv = document.createElement("div");
         plantDiv.className = "plant";
@@ -50,10 +56,9 @@ async function loadDashboard() {
         }).addTo(map);
 
         L.marker([p.lat, p.lon]).addTo(map)
-            .bindPopup(p.name)
-            .openPopup();
+            .bindPopup(p.name);
 
-        // ===== DATEN (History-Simulation) =====
+        // ===== SIMULIERTE ZEITREIHEN =====
         const labels = [];
         const actualKW = [];
         const expectedKW = [];
@@ -68,7 +73,7 @@ async function loadDashboard() {
             temperature.push(p.temperature + (Math.random() * 4 - 2));
         }
 
-        // ===== POWER CHART =====
+        // ===== LEISTUNG =====
         new Chart(document.getElementById(`power-${p.id}`), {
             type: "line",
             data: {
@@ -97,7 +102,7 @@ async function loadDashboard() {
             }
         });
 
-        // ===== VOLTAGE CHART =====
+        // ===== SPANNUNG =====
         new Chart(document.getElementById(`voltage-${p.id}`), {
             type: "line",
             data: {
@@ -120,7 +125,7 @@ async function loadDashboard() {
             }
         });
 
-        // ===== TEMPERATURE CHART =====
+        // ===== TEMPERATUR =====
         new Chart(document.getElementById(`temp-${p.id}`), {
             type: "line",
             data: {
