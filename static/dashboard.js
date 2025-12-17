@@ -1,26 +1,12 @@
 async function loadData() {
     const res = await fetch("/data");
     const data = await res.json();
-
     const container = document.getElementById("plants");
     container.innerHTML = "";
 
     data.plants.forEach(p => {
-
-        // Fallbacks – extrem wichtig
-        const plantType = p.plant_type || "–";
-        const modules = p.modules ?? "–";
-        const moduleWp = p.module_wp ?? "–";
-        const strings = p.strings ?? "–";
-        const year = p.year ?? "–";
-
-        const weather = p.weather || {};
-        const wind = weather.wind ?? "–";
-        const rain = weather.rain ?? "–";
-        const radiation = weather.radiation ?? "–";
-
         const div = document.createElement("div");
-        div.className = "plant";
+        div.className = `plant ${p.status}`;
 
         div.innerHTML = `
             <h2>${p.name} – ${p.status}</h2>
@@ -29,20 +15,20 @@ async function loadData() {
 
             <h3>Anlagen-Steckbrief</h3>
             <div class="info-grid">
-                <div class="info-box"><b>Typ</b><br>${plantType}</div>
-                <div class="info-box"><b>Module</b><br>${modules}</div>
-                <div class="info-box"><b>Modulgröße</b><br>${moduleWp} Wp</div>
-                <div class="info-box"><b>Strings</b><br>${strings}</div>
-                <div class="info-box"><b>Baujahr</b><br>${year}</div>
-                <div class="info-box"><b>Standort</b><br>${p.city}</div>
+                <div class="info-box">Typ<br><b>${p.plant_type}</b></div>
+                <div class="info-box">Module<br><b>${p.modules}</b></div>
+                <div class="info-box">Modulgröße<br><b>${p.module_wp} Wp</b></div>
+                <div class="info-box">Strings<br><b>${p.strings}</b></div>
+                <div class="info-box">Baujahr<br><b>${p.year}</b></div>
+                <div class="info-box">Standort<br><b>${p.city}</b></div>
             </div>
 
             <h3>Wetter am Standort</h3>
             <div class="weather-grid">
-                <div class="info-box"><b>Temperatur</b><br>${p.temperature} °C</div>
-                <div class="info-box"><b>Wind</b><br>${wind} m/s</div>
-                <div class="info-box"><b>Regen</b><br>${rain} mm</div>
-                <div class="info-box"><b>Einstrahlung</b><br>${radiation} W/m²</div>
+                <div class="info-box">Temperatur<br><b>${p.temperature} °C</b></div>
+                <div class="info-box">Wind<br><b>${p.weather.wind} m/s</b></div>
+                <div class="info-box">Regen<br><b>${p.weather.rain} mm</b></div>
+                <div class="info-box">Einstrahlung<br><b>${p.weather.radiation} W/m²</b></div>
             </div>
 
             <div id="map-${p.id}" class="map"></div>
@@ -54,12 +40,10 @@ async function loadData() {
 
         container.appendChild(div);
 
-        // Karte
         const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 10);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
         L.marker([p.lat, p.lon]).addTo(map);
 
-        // Charts
         createChart(`power-${p.id}`, ["Ist", "Soll"], [[p.actual_kw], [p.expected_kw]]);
         createChart(`voltage-${p.id}`, ["Spannung"], [[p.voltage]]);
         createChart(`temp-${p.id}`, ["Temperatur"], [[p.temperature]]);
@@ -78,14 +62,6 @@ function createChart(id, labels, values) {
                 borderDash: i === 1 ? [5, 5] : [],
                 fill: false
             }))
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { labels: { color: "#eee" } } },
-            scales: {
-                x: { ticks: { color: "#aaa" } },
-                y: { ticks: { color: "#aaa" } }
-            }
         }
     });
 }
