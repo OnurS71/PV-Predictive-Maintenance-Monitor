@@ -1,88 +1,93 @@
-const charts = {};
-const maps = {};
+async function loadData() {
+    const res = await fetch("/data");
+    const data = await res.json();
+    const container = document.getElementById("plants");
+    container.innerHTML = "";
 
-function lineChart(ctx, label) {
-  return new Chart(ctx, {
-    type: "line",
-    data: { labels: [], datasets: [{ label, data: [], borderWidth: 2, pointRadius: 0 }] },
-    options: { responsive:true, maintainAspectRatio:false }
-  });
-}
+    data.plants.forEach(plant => {
+        const div = document.createElement("div");
+        div.className = "plant";
 
-function dualChart(ctx) {
-  return new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        { label: "Ist-Leistung (kW)", data: [], borderWidth: 2 },
-        { label: "Soll-Leistung (kW)", data: [], borderDash:[6,6], borderWidth: 2 }
-      ]
-    },
-    options: { responsive:true, maintainAspectRatio:false }
-  });
-}
+        div.innerHTML = `
+            <div class="header">
+                <h2>${plant.name} – ${plant.status}</h2>
+                <div>${plant.city} | ${plant.kwp} kWp</div>
+                <div>Abweichung: ${plant.deviation}% | Health-Score: ${plant.health_score}/100</div>
+            </div>
 
-async function update() {
-  const res = await fetch("/data");
-  const json = await res.json();
-  const container = document.getElementById("plants");
+            <div class="info-grid">
+                <div class="info-box"><b>Typ</b><br>${plant.plant_type}</div>
+                <div class="info-box"><b>Module</b><br>${plant.modules}</div>
+                <div class="info-box"><b>Modulgröße</b><br>${plant.module_wp} Wp</div>
+                <div class="info-box"><b>Strings</b><br>${plant.strings}</div>
+                <div class="info-box"><b>Baujahr</b><br>${plant.year}</div>
+                <div class="info-box"><b>Standort</b><br>${plant.city}</div>
+            </div>
 
-  json.plants.forEach(p => {
-    if (!charts[p.id]) {
-      const div = document.createElement("div");
-      div.className = `plant ${p.status}`;
-      div.innerHTML = `
-        <h2>${p.name} – ${p.status}</h2>
-        <div class="info">
-          ${p.city} | ${p.kwp} kWp<br>
-          Abweichung: ${p.deviation}%<br>
-          Health-Score: ${p.health_score}/100
-        </div>
+            <div class="weather-grid">
+                <div class="info-box"><b>Temperatur</b><br>${plant.temperature} °C</div>
+                <div class="info-box"><b>Wind</b><br>${plant.weather.wind} m/s</div>
+                <div class="info-box"><b>Regen</b><br>${plant.weather.rain} mm</div>
+                <div class="info-box"><b>Einstrahlung</b><br>${plant.weather.radiation} W/m²</div>
+            </div>
 
-        <div id="map-${p.id}" class="map"></div>
+            <div id="map-${plant.id}" class="map"></div>
 
-        <div class="charts">
-          <div class="chartbox"><canvas id="p-${p.id}"></canvas></div>
-          <div class="chartbox"><canvas id="v-${p.id}"></canvas></div>
-          <div class="chartbox"><canvas id="t-${p.id}"></canvas></div>
-        </div>
-      `;
-      container.appendChild(div);
+            <canvas id="power-${plant.id}"></canvas>
+            <canvas id="voltage-${plant.id}"></canvas>
+            <canvas id="temp-${plant.id}"></canvas>
+        `;
 
-      const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 11);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-      L.marker([p.lat, p.lon]).addTo(map);
-      maps[p.id] = map;
+        container.appendChild(div);
 
-      charts[p.id] = {
-        power: dualChart(document.getElementById(`p-${p.id}`)),
-        voltage: lineChart(document.getElementById(`v-${p.id}`), "Spannung (V)"),
-        temp: lineChart(document.getElementById(`t-${p.id}`), "Temperatur (°C)")
-      };
-    }
+        // Map
+        const map = L.map(`map-${plant.id}`).setView([plant.lat, plant.lon], 10);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+        L.marker([plant.lat, plant.lon]).addTo(map);
 
-    const t = new Date(p.timestamp).toLocaleTimeString();
+        // Charts
+        createChart(`power-${plant.id}`, "Leistung (kW)",
+            ["Ist", "Soll"],
+            [[plant.actual_kw], [plant.expected_kw]]
+        );
 
-    charts[p.id].power.data.labels.push(t);
-    charts[p.id].power.data.datasets[0].data.push(p.actual_kw);
-    charts[p.id].power.data.datasets[1].data.push(p.expected_kw);
+        createChart(`voltage-${plant.id}`, "Spannung (V)",
+            ["Spannung"],
+            [[plant.voltage]]
+        );
 
-    charts[p.id].voltage.data.labels.push(t);
-    charts[p.id].voltage.data.datasets[0].data.push(p.voltage);
-
-    charts[p.id].temp.data.labels.push(t);
-    charts[p.id].temp.data.datasets[0].data.push(p.temperature);
-
-    Object.values(charts[p.id]).forEach(c => {
-      if (c.data.labels.length > 40) {
-        c.data.labels.shift();
-        c.data.datasets.forEach(d => d.data.shift());
-      }
-      c.update();
+        createChart(`temp-${plant.id}`, "Temperatur (°C)",
+            ["Temperatur"],
+            [[plant.temperature]]
+        );
     });
-  });
 }
 
-update();
-setInterval(update, 2000);
+function createChart(id, label, seriesNames, values) {
+    new Chart(document.getElementById(id), {
+        type: "line",
+        data: {
+            labels: ["now"],
+            datasets: seriesNames.map((name, i) => ({
+                label: name,
+                data: values[i],
+                borderColor: i === 0 ? "#3ddc97" : "#ff6384",
+                borderDash: i === 1 ? [5, 5] : [],
+                fill: false
+            }))
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { labels: { color: "#e0e0e0" } }
+            },
+            scales: {
+                x: { ticks: { color: "#aaa" } },
+                y: { ticks: { color: "#aaa" } }
+            }
+        }
+    });
+}
+
+loadData();
+setInterval(loadData, 5000);
