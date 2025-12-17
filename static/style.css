@@ -32,4 +32,9 @@
     background: #141414;
     border-radius: 10px;
     padding: 8px;
+
+    /* 🔑 DAS IST DER ENTSCHEIDENDE TEIL */
+    height: 260px !important;
+    max-height: 260px;
 }
+
