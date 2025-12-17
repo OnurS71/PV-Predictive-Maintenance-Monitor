@@ -1,88 +1,70 @@
-const charts = {};
-const maps = {};
+async function loadData() {
+    const res = await fetch("/data");
+    const data = await res.json();
+    const container = document.getElementById("plants");
+    container.innerHTML = "";
 
-function lineChart(ctx, label) {
-  return new Chart(ctx, {
-    type: "line",
-    data: { labels: [], datasets: [{ label, data: [], borderWidth: 2, pointRadius: 0 }] },
-    options: { responsive:true, maintainAspectRatio:false }
-  });
-}
+    data.plants.forEach(p => {
+        const div = document.createElement("div");
+        div.className = `plant ${p.status}`;
 
-function dualChart(ctx) {
-  return new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: [],
-      datasets: [
-        { label: "Ist-Leistung (kW)", data: [], borderWidth: 2 },
-        { label: "Soll-Leistung (kW)", data: [], borderDash:[6,6], borderWidth: 2 }
-      ]
-    },
-    options: { responsive:true, maintainAspectRatio:false }
-  });
-}
+        div.innerHTML = `
+            <h2>${p.name} – ${p.status}</h2>
+            <div>${p.city} | ${p.kwp} kWp</div>
+            <div>Abweichung: ${p.deviation}% | Health-Score: ${p.health_score}/100</div>
 
-async function update() {
-  const res = await fetch("/data");
-  const json = await res.json();
-  const container = document.getElementById("plants");
+            <h3>Anlagen-Steckbrief</h3>
+            <div class="info-grid">
+                <div class="info-box">Typ<br><b>${p.plant_type}</b></div>
+                <div class="info-box">Module<br><b>${p.modules}</b></div>
+                <div class="info-box">Modulgröße<br><b>${p.module_wp} Wp</b></div>
+                <div class="info-box">Strings<br><b>${p.strings}</b></div>
+                <div class="info-box">Baujahr<br><b>${p.year}</b></div>
+                <div class="info-box">Standort<br><b>${p.city}</b></div>
+            </div>
 
-  json.plants.forEach(p => {
-    if (!charts[p.id]) {
-      const div = document.createElement("div");
-      div.className = `plant ${p.status}`;
-      div.innerHTML = `
-        <h2>${p.name} – ${p.status}</h2>
-        <div class="info">
-          ${p.city} | ${p.kwp} kWp<br>
-          Abweichung: ${p.deviation}%<br>
-          Health-Score: ${p.health_score}/100
-        </div>
+            <h3>Wetter am Standort</h3>
+            <div class="weather-grid">
+                <div class="info-box">Temperatur<br><b>${p.temperature} °C</b></div>
+                <div class="info-box">Wind<br><b>${p.weather.wind} m/s</b></div>
+                <div class="info-box">Regen<br><b>${p.weather.rain} mm</b></div>
+                <div class="info-box">Einstrahlung<br><b>${p.weather.radiation} W/m²</b></div>
+            </div>
 
-        <div id="map-${p.id}" class="map"></div>
+            <div id="map-${p.id}" class="map"></div>
 
-        <div class="charts">
-          <div class="chartbox"><canvas id="p-${p.id}"></canvas></div>
-          <div class="chartbox"><canvas id="v-${p.id}"></canvas></div>
-          <div class="chartbox"><canvas id="t-${p.id}"></canvas></div>
-        </div>
-      `;
-      container.appendChild(div);
+            <canvas id="power-${p.id}"></canvas>
+            <canvas id="voltage-${p.id}"></canvas>
+            <canvas id="temp-${p.id}"></canvas>
+        `;
 
-      const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 11);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-      L.marker([p.lat, p.lon]).addTo(map);
-      maps[p.id] = map;
+        container.appendChild(div);
 
-      charts[p.id] = {
-        power: dualChart(document.getElementById(`p-${p.id}`)),
-        voltage: lineChart(document.getElementById(`v-${p.id}`), "Spannung (V)"),
-        temp: lineChart(document.getElementById(`t-${p.id}`), "Temperatur (°C)")
-      };
-    }
+        const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 10);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+        L.marker([p.lat, p.lon]).addTo(map);
 
-    const t = new Date(p.timestamp).toLocaleTimeString();
-
-    charts[p.id].power.data.labels.push(t);
-    charts[p.id].power.data.datasets[0].data.push(p.actual_kw);
-    charts[p.id].power.data.datasets[1].data.push(p.expected_kw);
-
-    charts[p.id].voltage.data.labels.push(t);
-    charts[p.id].voltage.data.datasets[0].data.push(p.voltage);
-
-    charts[p.id].temp.data.labels.push(t);
-    charts[p.id].temp.data.datasets[0].data.push(p.temperature);
-
-    Object.values(charts[p.id]).forEach(c => {
-      if (c.data.labels.length > 40) {
-        c.data.labels.shift();
-        c.data.datasets.forEach(d => d.data.shift());
-      }
-      c.update();
+        createChart(`power-${p.id}`, ["Ist", "Soll"], [[p.actual_kw], [p.expected_kw]]);
+        createChart(`voltage-${p.id}`, ["Spannung"], [[p.voltage]]);
+        createChart(`temp-${p.id}`, ["Temperatur"], [[p.temperature]]);
     });
-  });
 }
 
-update();
-setInterval(update, 2000);
+function createChart(id, labels, values) {
+    new Chart(document.getElementById(id), {
+        type: "line",
+        data: {
+            labels: ["now"],
+            datasets: labels.map((l, i) => ({
+                label: l,
+                data: values[i],
+                borderColor: i === 0 ? "#3ddc97" : "#ff6384",
+                borderDash: i === 1 ? [5, 5] : [],
+                fill: false
+            }))
+        }
+    });
+}
+
+loadData();
+setInterval(loadData, 5000);
