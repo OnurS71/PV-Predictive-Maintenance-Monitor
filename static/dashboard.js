@@ -1,142 +1,148 @@
-let charts = {};
-let history = {};
+console.log("dashboard.js geladen");
 
-// Zeitreihe puffern
-function pushHistory(key, value, max = 20) {
-    if (!history[key]) history[key] = [];
-    history[key].push(value);
-    if (history[key].length > max) history[key].shift();
-    return history[key];
-}
-
-async function loadData() {
+async function loadDashboard() {
     const res = await fetch("/data");
-    const data = await res.json();
+    const plants = await res.json();
 
     const container = document.getElementById("plants");
     container.innerHTML = "";
 
-    data.plants.forEach(p => {
-        const div = document.createElement("div");
-        div.className = `plant ${p.status}`;
+    plants.forEach(p => {
+        // ===== Anlagen-Container =====
+        const plantDiv = document.createElement("div");
+        plantDiv.className = "plant";
 
-        div.innerHTML = `
-            <h2>${p.name} – ${p.status}</h2>
-            <div>${p.city} | ${p.kwp} kWp</div>
-            <div>Abweichung: ${p.deviation}% | Health-Score: ${p.health_score}/100</div>
-
-            <h3>Anlagen-Steckbrief</h3>
-            <div class="info-grid">
-                <div class="info-box">Typ<br><b>${p.plant_type}</b></div>
-                <div class="info-box">Module<br><b>${p.modules}</b></div>
-                <div class="info-box">Modulgröße<br><b>${p.module_wp} Wp</b></div>
-                <div class="info-box">Strings<br><b>${p.strings}</b></div>
-                <div class="info-box">Baujahr<br><b>${p.year}</b></div>
-                <div class="info-box">Standort<br><b>${p.city}</b></div>
+        plantDiv.innerHTML = `
+            <div class="header">
+                <h2>${p.name} – ${p.city}</h2>
             </div>
 
-            <h3>Wetter am Standort</h3>
-            <div class="weather-grid">
-                <div class="info-box">Temperatur<br><b>${p.temperature} °C</b></div>
-                <div class="info-box">Wind<br><b>${p.weather.wind} m/s</b></div>
-                <div class="info-box">Regen<br><b>${p.weather.rain} mm</b></div>
-                <div class="info-box">Einstrahlung<br><b>${p.weather.radiation} W/m²</b></div>
+            <div class="info-grid">
+                <div class="info-box">Typ<br>${p.type}</div>
+                <div class="info-box">kWp<br>${p.kwp}</div>
+                <div class="info-box">Ausrichtung<br>${p.orientation}</div>
+                <div class="info-box">Neigung<br>${p.tilt}°</div>
+                <div class="info-box">Status<br>${p.status}</div>
+                <div class="info-box">Zeit<br>${p.timestamp}</div>
+            </div>
+
+            <div class="chart-grid">
+                <div class="chart-box">
+                    <canvas id="power-${p.id}"></canvas>
+                </div>
+                <div class="chart-box">
+                    <canvas id="voltage-${p.id}"></canvas>
+                </div>
+                <div class="chart-box">
+                    <canvas id="temp-${p.id}"></canvas>
+                </div>
             </div>
 
             <div id="map-${p.id}" class="map"></div>
-
-            <div class="chart-grid">
-                <canvas id="power-${p.id}"></canvas>
-                <canvas id="voltage-${p.id}"></canvas>
-                <canvas id="temp-${p.id}"></canvas>
-            </div>
         `;
 
-        container.appendChild(div);
+        container.appendChild(plantDiv);
 
-        // Karte (nach DOM-Aufbau!)
-        setTimeout(() => {
-            const map = L.map(`map-${p.id}`, { scrollWheelZoom: false })
-                .setView([p.lat, p.lon], 11);
+        // ===== MAP =====
+        const map = L.map(`map-${p.id}`).setView([p.lat, p.lon], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap"
+        }).addTo(map);
 
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                attribution: "&copy; OpenStreetMap"
-            }).addTo(map);
+        L.marker([p.lat, p.lon]).addTo(map)
+            .bindPopup(p.name)
+            .openPopup();
 
-            L.marker([p.lat, p.lon]).addTo(map);
-        }, 0);
+        // ===== DATEN (History-Simulation) =====
+        const labels = [];
+        const actualKW = [];
+        const expectedKW = [];
+        const voltage = [];
+        const temperature = [];
 
-        // Charts
-        renderChart(
-            `power-${p.id}`,
-            ["Ist", "Soll"],
-            [
-                pushHistory(`actual-${p.id}`, p.actual_kw),
-                pushHistory(`expected-${p.id}`, p.expected_kw)
-            ],
-            0, p.kwp * 1.1, "kW"
-        );
+        for (let i = 0; i < 24; i++) {
+            labels.push(`${i}:00`);
+            actualKW.push(p.actual_kw * (0.7 + Math.random() * 0.6));
+            expectedKW.push(p.expected_kw);
+            voltage.push(p.voltage + (Math.random() * 10 - 5));
+            temperature.push(p.temperature + (Math.random() * 4 - 2));
+        }
 
-        renderChart(
-            `voltage-${p.id}`,
-            ["Spannung"],
-            [pushHistory(`voltage-${p.id}`, p.voltage)],
-            600, 800, "V"
-        );
-
-        renderChart(
-            `temp-${p.id}`,
-            ["Temperatur"],
-            [pushHistory(`temp-${p.id}`, p.temperature)],
-            -20, 80, "°C"
-        );
-    });
-}
-
-function renderChart(id, labels, datasets, yMin, yMax, unit) {
-    const canvas = document.getElementById(id);
-    if (!canvas) return;
-
-    if (charts[id]) charts[id].destroy();
-
-    charts[id] = new Chart(canvas, {
-        type: "line",
-        data: {
-            labels: datasets[0].map((_, i) => i),
-            datasets: labels.map((label, i) => ({
-                label,
-                data: datasets[i],
-                borderColor: i === 0 ? "#3ddc97" : "#ff6384",
-                borderDash: i === 1 ? [5, 5] : [],
-                fill: false,
-                tension: 0.3
-            }))
-        },
-        options: {
-            responsive: true,
-
-            /* 🔑 GANZ WICHTIG */
-            maintainAspectRatio: false,
-
-            animation: false,
-            plugins: {
-                legend: { labels: { color: "#ccc" } }
+        // ===== POWER CHART =====
+        new Chart(document.getElementById(`power-${p.id}`), {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "IST-Leistung (kW)",
+                        data: actualKW,
+                        borderColor: "#3ddc97",
+                        tension: 0.3
+                    },
+                    {
+                        label: "SOLL-Leistung (kW)",
+                        data: expectedKW,
+                        borderColor: "#888",
+                        borderDash: [5, 5],
+                        tension: 0.3
+                    }
+                ]
             },
-            scales: {
-                x: { display: false },
-                y: {
-                    min: yMin,
-                    max: yMax,
-                    ticks: {
-                        color: "#aaa",
-                        callback: v => v + " " + unit
+            options: {
+                responsive: true,
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // ===== VOLTAGE CHART =====
+        new Chart(document.getElementById(`voltage-${p.id}`), {
+            type: "line",
+            data: {
+                labels,
+                datasets: [{
+                    label: "DC-Spannung (V)",
+                    data: voltage,
+                    borderColor: "#4aa3ff",
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        min: 600,
+                        max: 750
                     }
                 }
             }
-        }
+        });
+
+        // ===== TEMPERATURE CHART =====
+        new Chart(document.getElementById(`temp-${p.id}`), {
+            type: "line",
+            data: {
+                labels,
+                datasets: [{
+                    label: "Temperatur (°C)",
+                    data: temperature,
+                    borderColor: "#ff6b6b",
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        min: -10,
+                        max: 60
+                    }
+                }
+            }
+        });
     });
 }
 
-
-loadData();
-setInterval(loadData, 5000);
+loadDashboard();
