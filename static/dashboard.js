@@ -114,6 +114,10 @@ function renderChart(id, labels, datasets, yMin, yMax, unit) {
         },
         options: {
             responsive: true,
+
+            /* 🔑 GANZ WICHTIG */
+            maintainAspectRatio: false,
+
             animation: false,
             plugins: {
                 legend: { labels: { color: "#ccc" } }
@@ -132,6 +136,7 @@ function renderChart(id, labels, datasets, yMin, yMax, unit) {
         }
     });
 }
+
 
 loadData();
 setInterval(loadData, 5000);
