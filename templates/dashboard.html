@@ -59,7 +59,17 @@
             margin-bottom: 15px;
             border-radius: 6px;
         }
+        .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
 
+.chart-box {
+    background: #1a1d24;
+    padding: 10px;
+    border-radius: 6px;
+}
         canvas {
             margin-top: 15px;
         }
@@ -69,7 +79,20 @@
 <body>
 <h1>PV Predictive Maintenance Dashboard</h1>
 
-<div id="plants"></div>
+<div class="charts-grid">
+    <div class="chart-box">
+        <canvas id="powerChart"></canvas>
+    </div>
+
+    <div class="chart-box">
+        <canvas id="voltageChart"></canvas>
+    </div>
+
+    <div class="chart-box">
+        <canvas id="temperatureChart"></canvas>
+    </div>
+</div>
+
 
 <script src="/static/dashboard.js?v=final-layout-fix"></script>
 
